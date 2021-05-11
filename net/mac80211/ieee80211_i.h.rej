@@ -1,0 +1,10 @@
+--- net/mac80211/ieee80211_i.h
++++ net/mac80211/ieee80211_i.h
+@@ -1401,7 +1401,6 @@ struct ieee80211_local {
+ 	int dynamic_ps_forced_timeout;
+ 
+ 	int user_power_level; /* in dBm, for all interfaces */
+-	int user_antenna_gain; /* in dBi */
+ 
+ 	enum ieee80211_smps_mode smps_mode;
+ 

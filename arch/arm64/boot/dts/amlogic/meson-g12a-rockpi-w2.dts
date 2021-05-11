@@ -1,0 +1,18 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
+ */
+
+/dts-v1/;
+
+#include "meson-g12a-x96-max.dts"
+
+/ {
+	compatible = "amlogic,u200", "amlogic,g12a";
+	model = "RockPI W2";
+
+};
+
+&ethmac {
+        status = "disable";
+};

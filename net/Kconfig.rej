@@ -1,0 +1,9 @@
+--- net/Kconfig
++++ net/Kconfig
+@@ -473,6 +473,3 @@ config HAVE_CBPF_JIT
+ # Extended BPF JIT (eBPF)
+ config HAVE_EBPF_JIT
+ 	bool
+-
+-config SHORTCUT_FE
+-	bool "Enables kernel network stack path for Shortcut  Forwarding Engine

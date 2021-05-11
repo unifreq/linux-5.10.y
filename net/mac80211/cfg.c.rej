@@ -1,0 +1,30 @@
+--- net/mac80211/cfg.c
++++ net/mac80211/cfg.c
+@@ -2707,19 +2707,6 @@ static int ieee80211_get_tx_power(struct
+ 	return 0;
+ }
+ 
+-static int ieee80211_set_antenna_gain(struct wiphy *wiphy, int dbi)
+-{
+-	struct ieee80211_local *local = wiphy_priv(wiphy);
+-
+-	if (dbi < 0)
+-		return -EINVAL;
+-
+-	local->user_antenna_gain = dbi;
+-	ieee80211_hw_config(local, 0);
+-
+-	return 0;
+-}
+-
+ static int ieee80211_set_wds_peer(struct wiphy *wiphy, struct net_device *dev,
+ 				  const u8 *addr)
+ {
+@@ -4150,7 +4137,6 @@ const struct cfg80211_ops mac80211_confi
+ 	.set_wiphy_params = ieee80211_set_wiphy_params,
+ 	.set_tx_power = ieee80211_set_tx_power,
+ 	.get_tx_power = ieee80211_get_tx_power,
+-	.set_antenna_gain = ieee80211_set_antenna_gain,
+ 	.set_wds_peer = ieee80211_set_wds_peer,
+ 	.rfkill_poll = ieee80211_rfkill_poll,
+ 	CFG80211_TESTMODE_CMD(ieee80211_testmode_cmd)

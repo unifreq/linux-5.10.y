@@ -1,0 +1,10 @@
+--- net/mac80211/rc80211_minstrel.h
++++ net/mac80211/rc80211_minstrel.h
+@@ -152,7 +152,6 @@ struct minstrel_priv {
+ 	unsigned int lookaround_rate_mrr;
+ 
+ 	u8 cck_rates[4];
+-	u8 ofdm_rates[NUM_NL80211_BANDS][8];
+ 
+ #ifdef CPTCFG_MAC80211_DEBUGFS
+ 	/*
