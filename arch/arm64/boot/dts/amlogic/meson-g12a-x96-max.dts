@@ -11,8 +11,9 @@
 #include <dt-bindings/sound/meson-g12a-tohdmitx.h>
 
 / {
-	compatible = "amediatech,x96-max", "amlogic,g12a";
+	//compatible = "amediatech,x96-max", "amlogic,g12a";
 	//model = "Shenzhen Amediatech Technology Co., Ltd X96 Max";
+	compatible = "amlogic,g12a";
 	model = "AMedia X96 Max";
 
 	aliases {
@@ -163,7 +164,7 @@
 
 	sound {
 		compatible = "amlogic,axg-sound-card";
-		model = "G12A-X96-MAX";
+		model = "X96-MAX";
 		audio-aux-devs = <&tdmout_b>;
 		audio-routing = "TDMOUT_B IN 0", "FRDDR_A OUT 1",
 				"TDMOUT_B IN 1", "FRDDR_B OUT 1",
@@ -367,17 +368,24 @@
 };
 
 &ethmac {
+	status = "okay";
+
 	pinctrl-0 = <&eth_pins>, <&eth_rgmii_pins>;
 	pinctrl-names = "default";
-	status = "okay";
-	phy-mode = "rgmii";
+	phy-mode = "rgmii-txid";
 	phy-handle = <&external_phy>;
-	amlogic,tx-delay-ns = <2>;
+
+	rx-internal-delay-ps = <800>;
+
+	snps,aal;
+	snps,rxpbl = <0x8>;
+	snps,txpbl = <0x8>;
+
+	rx-fifo-depth = <4096>;
+	tx-fifo-depth = <4096>;
+
 	nvmem-cells = <&eth_mac>;
 	nvmem-cell-names = "eth_mac";
-	//snps,aal;
-	//snps,rxpbl = <0x8>;
-	//snps,txpbl = <0x8>;
 };
 
 &pwm_ef {
@@ -510,17 +518,22 @@
 };
 
 &cpu_opp_table {
+        opp-100000000 {
+		status = "disabled";
+	};
 
-	opp-1896000000 {
-		opp-hz = /bits/ 64 <1896000000>;
+        opp-250000000 {
+		status = "disabled";
+	};
+
+        opp-500000000 {
+		status = "disabled";
+	};
+
+	opp-1908000000 {
+		opp-hz = /bits/ 64 <1908000000>;
 		opp-microvolt = <1011000>;
 	};
-
-	opp-1944000000 {
-		opp-hz = /bits/ 64 <1944000000>;
-		opp-microvolt = <1021000>;
-	};
-
 };
 
 &efuse {
