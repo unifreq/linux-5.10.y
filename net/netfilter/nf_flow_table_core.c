@@ -7,6 +7,7 @@
 #include <linux/netdevice.h>
 #include <net/ip.h>
 #include <net/ip6_route.h>
+#include <net/netfilter/nf_tables.h>
 #include <net/netfilter/nf_flow_table.h>
 #include <net/netfilter/nf_conntrack.h>
 #include <net/netfilter/nf_conntrack_core.h>
@@ -78,8 +79,11 @@ static int flow_offload_fill_route(struct flow_offload *flow,
 				   enum flow_offload_tuple_dir dir)
 {
 	struct flow_offload_tuple *flow_tuple = &flow->tuplehash[dir].tuple;
+	struct dst_entry *other_dst = route->tuple[!dir].dst;
 	struct dst_entry *dst = route->tuple[dir].dst;
-	int i, j = 0;
+
+	if (!dst_hold_safe(route->tuple[dir].dst))
+		return -1;
 
 	switch (flow_tuple->l3proto) {
 	case NFPROTO_IPV4:
@@ -90,44 +94,10 @@ static int flow_offload_fill_route(struct flow_offload *flow,
 		break;
 	}
 
-	flow_tuple->iifidx = route->tuple[dir].in.ifindex;
-	for (i = route->tuple[dir].in.num_encaps - 1; i >= 0; i--) {
-		flow_tuple->encap[j].id = route->tuple[dir].in.encap[i].id;
-		flow_tuple->encap[j].proto = route->tuple[dir].in.encap[i].proto;
-		if (route->tuple[dir].in.ingress_vlans & BIT(i))
-			flow_tuple->in_vlan_ingress |= BIT(j);
-		j++;
-	}
-	flow_tuple->encap_num = route->tuple[dir].in.num_encaps;
-
-	switch (route->tuple[dir].xmit_type) {
-	case FLOW_OFFLOAD_XMIT_DIRECT:
-		memcpy(flow_tuple->out.h_dest, route->tuple[dir].out.h_dest,
-		       ETH_ALEN);
-		memcpy(flow_tuple->out.h_source, route->tuple[dir].out.h_source,
-		       ETH_ALEN);
-		flow_tuple->out.ifidx = route->tuple[dir].out.ifindex;
-		flow_tuple->out.hw_ifidx = route->tuple[dir].out.hw_ifindex;
-		break;
-	case FLOW_OFFLOAD_XMIT_XFRM:
-	case FLOW_OFFLOAD_XMIT_NEIGH:
-		if (!dst_hold_safe(route->tuple[dir].dst))
-			return -1;
-
-		flow_tuple->dst_cache = dst;
-		break;
-	}
-	flow_tuple->xmit_type = route->tuple[dir].xmit_type;
+	flow_tuple->iifidx = other_dst->dev->ifindex;
+	flow_tuple->dst_cache = dst;
 
 	return 0;
-}
-
-static void nft_flow_dst_release(struct flow_offload *flow,
-				 enum flow_offload_tuple_dir dir)
-{
-	if (flow->tuplehash[dir].tuple.xmit_type == FLOW_OFFLOAD_XMIT_NEIGH ||
-	    flow->tuplehash[dir].tuple.xmit_type == FLOW_OFFLOAD_XMIT_XFRM)
-		dst_release(flow->tuplehash[dir].tuple.dst_cache);
 }
 
 int flow_offload_route_init(struct flow_offload *flow,
@@ -148,7 +118,7 @@ int flow_offload_route_init(struct flow_offload *flow,
 	return 0;
 
 err_route_reply:
-	nft_flow_dst_release(flow, FLOW_OFFLOAD_DIR_ORIGINAL);
+	dst_release(route->tuple[FLOW_OFFLOAD_DIR_ORIGINAL].dst);
 
 	return err;
 }
@@ -199,8 +169,8 @@ static void flow_offload_fixup_ct(struct nf_conn *ct)
 
 static void flow_offload_route_release(struct flow_offload *flow)
 {
-	nft_flow_dst_release(flow, FLOW_OFFLOAD_DIR_ORIGINAL);
-	nft_flow_dst_release(flow, FLOW_OFFLOAD_DIR_REPLY);
+	dst_release(flow->tuplehash[FLOW_OFFLOAD_DIR_ORIGINAL].tuple.dst_cache);
+	dst_release(flow->tuplehash[FLOW_OFFLOAD_DIR_REPLY].tuple.dst_cache);
 }
 
 void flow_offload_free(struct flow_offload *flow)
@@ -221,14 +191,14 @@ static u32 flow_offload_hash(const void *data, u32 len, u32 seed)
 {
 	const struct flow_offload_tuple *tuple = data;
 
-	return jhash(tuple, offsetof(struct flow_offload_tuple, __hash), seed);
+	return jhash(tuple, offsetof(struct flow_offload_tuple, dir), seed);
 }
 
 static u32 flow_offload_hash_obj(const void *data, u32 len, u32 seed)
 {
 	const struct flow_offload_tuple_rhash *tuplehash = data;
 
-	return jhash(&tuplehash->tuple, offsetof(struct flow_offload_tuple, __hash), seed);
+	return jhash(&tuplehash->tuple, offsetof(struct flow_offload_tuple, dir), seed);
 }
 
 static int flow_offload_hash_cmp(struct rhashtable_compare_arg *arg,
@@ -237,7 +207,7 @@ static int flow_offload_hash_cmp(struct rhashtable_compare_arg *arg,
 	const struct flow_offload_tuple *tuple = arg->key;
 	const struct flow_offload_tuple_rhash *x = ptr;
 
-	if (memcmp(&x->tuple, tuple, offsetof(struct flow_offload_tuple, __hash)))
+	if (memcmp(&x->tuple, tuple, offsetof(struct flow_offload_tuple, dir)))
 		return 1;
 
 	return 0;
@@ -355,7 +325,8 @@ flow_offload_lookup(struct nf_flowtable *flow_table,
 }
 EXPORT_SYMBOL_GPL(flow_offload_lookup);
 
-int nf_flow_table_iterate(struct nf_flowtable *flow_table,
+static int
+nf_flow_table_iterate(struct nf_flowtable *flow_table,
 		      void (*iter)(struct flow_offload *flow, void *data),
 		      void *data)
 {
@@ -387,7 +358,6 @@ int nf_flow_table_iterate(struct nf_flowtable *flow_table,
 
 	return err;
 }
-EXPORT_SYMBOL_GPL(nf_flow_table_iterate);
 
 static void nf_flow_offload_gc_step(struct flow_offload *flow, void *data)
 {
@@ -419,19 +389,28 @@ static void nf_flow_offload_work_gc(struct work_struct *work)
 	queue_delayed_work(system_power_efficient_wq, &flow_table->gc_work, HZ);
 }
 
-static void nf_flow_nat_port_tcp(struct sk_buff *skb, unsigned int thoff,
-				 __be16 port, __be16 new_port)
+
+static int nf_flow_nat_port_tcp(struct sk_buff *skb, unsigned int thoff,
+				__be16 port, __be16 new_port)
 {
 	struct tcphdr *tcph;
 
+	if (skb_try_make_writable(skb, thoff + sizeof(*tcph)))
+		return -1;
+
 	tcph = (void *)(skb_network_header(skb) + thoff);
 	inet_proto_csum_replace2(&tcph->check, skb, port, new_port, false);
+
+	return 0;
 }
 
-static void nf_flow_nat_port_udp(struct sk_buff *skb, unsigned int thoff,
-				 __be16 port, __be16 new_port)
+static int nf_flow_nat_port_udp(struct sk_buff *skb, unsigned int thoff,
+				__be16 port, __be16 new_port)
 {
 	struct udphdr *udph;
+
+	if (skb_try_make_writable(skb, thoff + sizeof(*udph)))
+		return -1;
 
 	udph = (void *)(skb_network_header(skb) + thoff);
 	if (udph->check || skb->ip_summed == CHECKSUM_PARTIAL) {
@@ -440,27 +419,36 @@ static void nf_flow_nat_port_udp(struct sk_buff *skb, unsigned int thoff,
 		if (!udph->check)
 			udph->check = CSUM_MANGLED_0;
 	}
+
+	return 0;
 }
 
-static void nf_flow_nat_port(struct sk_buff *skb, unsigned int thoff,
-			     u8 protocol, __be16 port, __be16 new_port)
+static int nf_flow_nat_port(struct sk_buff *skb, unsigned int thoff,
+			    u8 protocol, __be16 port, __be16 new_port)
 {
 	switch (protocol) {
 	case IPPROTO_TCP:
-		nf_flow_nat_port_tcp(skb, thoff, port, new_port);
+		if (nf_flow_nat_port_tcp(skb, thoff, port, new_port) < 0)
+			return NF_DROP;
 		break;
 	case IPPROTO_UDP:
-		nf_flow_nat_port_udp(skb, thoff, port, new_port);
+		if (nf_flow_nat_port_udp(skb, thoff, port, new_port) < 0)
+			return NF_DROP;
 		break;
 	}
+
+	return 0;
 }
 
-void nf_flow_snat_port(const struct flow_offload *flow,
-		       struct sk_buff *skb, unsigned int thoff,
-		       u8 protocol, enum flow_offload_tuple_dir dir)
+int nf_flow_snat_port(const struct flow_offload *flow,
+		      struct sk_buff *skb, unsigned int thoff,
+		      u8 protocol, enum flow_offload_tuple_dir dir)
 {
 	struct flow_ports *hdr;
 	__be16 port, new_port;
+
+	if (skb_try_make_writable(skb, thoff + sizeof(*hdr)))
+		return -1;
 
 	hdr = (void *)(skb_network_header(skb) + thoff);
 
@@ -475,18 +463,23 @@ void nf_flow_snat_port(const struct flow_offload *flow,
 		new_port = flow->tuplehash[FLOW_OFFLOAD_DIR_ORIGINAL].tuple.src_port;
 		hdr->dest = new_port;
 		break;
+	default:
+		return -1;
 	}
 
-	nf_flow_nat_port(skb, thoff, protocol, port, new_port);
+	return nf_flow_nat_port(skb, thoff, protocol, port, new_port);
 }
 EXPORT_SYMBOL_GPL(nf_flow_snat_port);
 
-void nf_flow_dnat_port(const struct flow_offload *flow, struct sk_buff *skb,
-		       unsigned int thoff, u8 protocol,
-		       enum flow_offload_tuple_dir dir)
+int nf_flow_dnat_port(const struct flow_offload *flow,
+		      struct sk_buff *skb, unsigned int thoff,
+		      u8 protocol, enum flow_offload_tuple_dir dir)
 {
 	struct flow_ports *hdr;
 	__be16 port, new_port;
+
+	if (skb_try_make_writable(skb, thoff + sizeof(*hdr)))
+		return -1;
 
 	hdr = (void *)(skb_network_header(skb) + thoff);
 
@@ -501,9 +494,11 @@ void nf_flow_dnat_port(const struct flow_offload *flow, struct sk_buff *skb,
 		new_port = flow->tuplehash[FLOW_OFFLOAD_DIR_ORIGINAL].tuple.dst_port;
 		hdr->source = new_port;
 		break;
+	default:
+		return -1;
 	}
 
-	nf_flow_nat_port(skb, thoff, protocol, port, new_port);
+	return nf_flow_nat_port(skb, thoff, protocol, port, new_port);
 }
 EXPORT_SYMBOL_GPL(nf_flow_dnat_port);
 
@@ -582,41 +577,13 @@ void nf_flow_table_free(struct nf_flowtable *flow_table)
 }
 EXPORT_SYMBOL_GPL(nf_flow_table_free);
 
-static int nf_flow_table_netdev_event(struct notifier_block *this,
-				      unsigned long event, void *ptr)
-{
-	struct net_device *dev = netdev_notifier_info_to_dev(ptr);
-
-	if (event != NETDEV_DOWN)
-		return NOTIFY_DONE;
-
-	nf_flow_table_cleanup(dev);
-
-	return NOTIFY_DONE;
-}
-
-static struct notifier_block flow_offload_netdev_notifier = {
-	.notifier_call	= nf_flow_table_netdev_event,
-};
-
 static int __init nf_flow_table_module_init(void)
 {
-	int ret;
-
-	ret = nf_flow_table_offload_init();
-	if (ret)
-		return ret;
-
-	ret = register_netdevice_notifier(&flow_offload_netdev_notifier);
-	if (ret)
-		nf_flow_table_offload_exit();
-
-	return ret;
+	return nf_flow_table_offload_init();
 }
 
 static void __exit nf_flow_table_module_exit(void)
 {
-	unregister_netdevice_notifier(&flow_offload_netdev_notifier);
 	nf_flow_table_offload_exit();
 }
 
