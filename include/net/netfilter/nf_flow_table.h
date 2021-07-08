@@ -129,7 +129,10 @@ struct flow_offload_tuple {
 					in_vlan_ingress:2;
 	u16				mtu;
 	union {
-		struct dst_entry	*dst_cache;
+		struct {
+			struct dst_entry *dst_cache;
+			u32		dst_cookie;
+		};
 		struct {
 			u32		ifidx;
 			u32		hw_ifidx;
@@ -170,6 +173,8 @@ struct flow_offload {
 
 #define NF_FLOW_TIMEOUT (30 * HZ)
 #define nf_flowtable_time_stamp	(u32)jiffies
+
+unsigned long flow_offload_get_timeout(struct flow_offload *flow);
 
 static inline __s32 nf_flow_timeout_delta(unsigned int timeout)
 {
