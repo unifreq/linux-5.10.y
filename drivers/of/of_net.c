@@ -89,7 +89,6 @@ static void *of_get_mac_address_mtd(struct device_node *np)
 #ifdef CONFIG_MTD
 	struct platform_device *pdev = of_find_device_by_node(np);
 	struct device_node *mtd_np = NULL;
-	struct property *prop;
 	size_t retlen;
 	int size, ret;
 	struct mtd_info *mtd;
