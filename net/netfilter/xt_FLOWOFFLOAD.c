@@ -449,6 +449,7 @@ flowoffload_tg(struct sk_buff *skb, const struct xt_action_param *par)
 	if (!nf_ct_is_confirmed(ct))
 		return XT_CONTINUE;
 
+	dir = CTINFO2DIR(ctinfo);
 	devs[dir] = xt_out(par);
 	devs[!dir] = xt_in(par);
 
