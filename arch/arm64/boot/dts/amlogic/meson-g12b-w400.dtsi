@@ -8,7 +8,6 @@
 /dts-v1/;
 
 #include "meson-g12b.dtsi"
-#include "meson-g12b-s922x.dtsi"
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/gpio/meson-g12a-gpio.h>
 
@@ -22,7 +21,7 @@
 		stdout-path = "serial0:115200n8";
 	};
 
-	memory: memory@0 {
+	memory@0 {
 		device_type = "memory";
 		reg = <0x0 0x0 0x0 0x40000000>;
 	};
@@ -280,13 +279,6 @@
 	phy-mode = "rgmii";
 	phy-handle = <&external_phy>;
 	amlogic,tx-delay-ns = <2>;
-
-        snps,aal;
-        snps,rxpbl = <0x8>;
-        snps,txpbl = <0x8>;
-
-        rx-fifo-depth = <4096>;
-        tx-fifo-depth = <4096>;
 };
 
 &hdmi_tx {
@@ -429,12 +421,4 @@
 
 &usb2_phy1 {
 	phy-supply = <&usb1_pow>;
-};
-
-&reserved_memory {
-	/* 32 MiB reserved for ARM Trusted Firmware (BL32) */
-	secmon_reserved_bl32: secmon@5300000 {
-		reg = <0x0 0x05300000 0x0 0x2000000>;
-		no-map;
-	};
 };
