@@ -558,14 +558,6 @@
 	vref-supply = <&vddao_1v8>;
 };
 
-&saradc {
-	status = "okay";
-};
-
-&saradc {
-	status = "okay";
-};
-
 /* SD card */
 &sd_emmc_b {
 	status = "okay";
@@ -575,11 +567,7 @@
 
 	bus-width = <4>;
 	cap-sd-highspeed;
-	max-frequency = <200000000>;
-	sd-uhs-sdr12;
-	sd-uhs-sdr25;
-	sd-uhs-sdr50;
-	sd-uhs-sdr104;
+	max-frequency = <50000000>;
 	disable-wp;
 
 	cd-gpios = <&gpio GPIOC_6 GPIO_ACTIVE_LOW>;
