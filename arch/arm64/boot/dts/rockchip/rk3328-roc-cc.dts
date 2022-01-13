@@ -58,31 +58,31 @@
 
 		opp-786000000 {
 			opp-hz = /bits/ 64 <786000000>;
-			opp-microvolt = <1075000>;
-			opp-microvolt-L0 = <1075000>;
-			opp-microvolt-L1 = <1050000>;
+			opp-microvolt    = <1150000>;
+			opp-microvolt-L0 = <1150000>;
+			opp-microvolt-L1 = <1150000>;
 		};
 		opp-798000000 {
 			opp-hz = /bits/ 64 <798000000>;
-			opp-microvolt = <1075000>;
-			opp-microvolt-L0 = <1075000>;
-			opp-microvolt-L1 = <1050000>;
+			opp-microvolt    = <1150000>;
+			opp-microvolt-L0 = <1150000>;
+			opp-microvolt-L1 = <1150000>;
 		};
 		opp-840000000 {
 			opp-hz = /bits/ 64 <840000000>;
-			opp-microvolt = <1075000>;
-			opp-microvolt-L0 = <1075000>;
-			opp-microvolt-L1 = <1050000>;
+			opp-microvolt    = <1150000>;
+			opp-microvolt-L0 = <1150000>;
+			opp-microvolt-L1 = <1150000>;
 		};
 		opp-924000000 {
 			opp-hz = /bits/ 64 <924000000>;
-			opp-microvolt = <1100000>;
-			opp-microvolt-L0 = <1100000>;
-			opp-microvolt-L1 = <1075000>;
+			opp-microvolt    = <1150000>;
+			opp-microvolt-L0 = <1150000>;
+			opp-microvolt-L1 = <1150000>;
 		};
 		opp-1068000000 {
 			opp-hz = /bits/ 64 <1068000000>;
-			opp-microvolt = <1175000>;
+			opp-microvolt    = <1175000>;
 			opp-microvolt-L0 = <1175000>;
 			opp-microvolt-L1 = <1150000>;
 		};
@@ -232,6 +232,7 @@
 };
 
 &gpu {
+	status = "okay";
 	mali-supply = <&vdd_logic>;
 };
 
