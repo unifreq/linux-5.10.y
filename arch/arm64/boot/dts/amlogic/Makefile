@@ -5,6 +5,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-g12a-rockpi-w2.dtb
 dtb-$(CONFIG_ARCH_MESON) += meson-g12a-sei510.dtb
 dtb-$(CONFIG_ARCH_MESON) += meson-g12a-tanix-tx5max.dtb
 dtb-$(CONFIG_ARCH_MESON) += meson-g12a-u200.dtb
+dtb-$(CONFIG_ARCH_MESON) += meson-g12a-e900v22c.dtb
 dtb-$(CONFIG_ARCH_MESON) += meson-g12a-x96-max.dtb
 dtb-$(CONFIG_ARCH_MESON) += meson-g12a-x96-max-rmii.dtb
 dtb-$(CONFIG_ARCH_MESON) += meson-g12b-dreambox-one.dtb
