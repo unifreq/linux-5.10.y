@@ -173,6 +173,8 @@ struct meson_host {
 	int irq;
 
 	bool vqmmc_enabled;
+	bool needs_pre_post_req;
+
 };
 
 #define CMD_CFG_LENGTH_MASK GENMASK(8, 0)
@@ -228,6 +230,7 @@ static void meson_mmc_get_transfer_mode(struct mmc_host *mmc,
 	struct mmc_data *data = mrq->data;
 	struct scatterlist *sg;
 	int i;
+	bool use_desc_chain_mode = true;
 
 	/*
 	 * When Controller DMA cannot directly access DDR memory, disable
@@ -237,36 +240,25 @@ static void meson_mmc_get_transfer_mode(struct mmc_host *mmc,
 	if (host->dram_access_quirk)
 		return;
 
-	/* SD_IO_RW_EXTENDED (CMD53) can also use block mode under the hood */
-	if (data->blocks > 1 || mrq->cmd->opcode == SD_IO_RW_EXTENDED) {
-		/*
-		 * In block mode DMA descriptor format, "length" field indicates
-		 * number of blocks and there is no way to pass DMA size that
-		 * is not multiple of SDIO block size, making it impossible to
-		 * tie more than one memory buffer with single SDIO block.
-		 * Block mode sg buffer size should be aligned with SDIO block
-		 * size, otherwise chain mode could not be used.
-		 */
-		for_each_sg(data->sg, sg, data->sg_len, i) {
-			if (sg->length % data->blksz) {
-				WARN_ONCE(1, "unaligned sg len %u blksize %u\n",
-					  sg->length, data->blksz);
-				return;
-			}
-		}
-	}
+	/*
+	 * Broken SDIO with AP6255-based WiFi on Khadas VIM Pro has been
+	 * reported. For some strange reason this occurs in descriptor
+	 * chain mode only. So let's fall back to bounce buffer mode
+	 * for command SD_IO_RW_EXTENDED.
+	 */
+	if (mrq->cmd->opcode == SD_IO_RW_EXTENDED)
+		return;
 
-	for_each_sg(data->sg, sg, data->sg_len, i) {
+	for_each_sg(data->sg, sg, data->sg_len, i)
 		/* check for 8 byte alignment */
-		if (sg->offset % 8) {
-			dev_warn_once(mmc_dev(mmc),
-				      "unaligned sg offset %u, disabling descriptor DMA for transfer\n",
-				      sg->offset);
-			return;
+		if (sg->offset & 7) {
+			WARN_ONCE(1, "unaligned scatterlist buffer\n");
+			use_desc_chain_mode = false;
+			break;
 		}
-	}
 
-	data->host_cookie |= SD_EMMC_DESC_CHAIN_MODE;
+	if (use_desc_chain_mode)
+		data->host_cookie |= SD_EMMC_DESC_CHAIN_MODE;
 }
 
 static inline bool meson_mmc_desc_chain_mode(const struct mmc_data *data)
@@ -662,6 +654,8 @@ static void meson_mmc_request_done(struct mmc_host *mmc,
 	struct meson_host *host = mmc_priv(mmc);
 
 	host->cmd = NULL;
+	if (host->needs_pre_post_req)
+		meson_mmc_post_req(mmc, mrq, 0);
 	mmc_request_done(host->mmc, mrq);
 }
 
@@ -767,14 +761,7 @@ static void meson_mmc_copy_buffer(struct meson_host *host, struct mmc_data *data
 		unsigned int len, left;
 		u32 *buf = miter.addr;
 
-		if (((unsigned long int)miter.addr % 4))
-			dev_err(host->dev, "non word aligned sg");
-
 		len = min(miter.length, buflen - offset);
-
-		if ((len % 4))
-			dev_err(host->dev, "non word multiple sg");
-
 		left = len;
 
 		if (to_buffer) {
@@ -865,28 +852,56 @@ static void meson_mmc_start_cmd(struct mmc_host *mmc, struct mmc_command *cmd)
 	writel(cmd->arg, host->regs + SD_EMMC_CMD_ARG);
 }
 
+static int meson_mmc_validate_dram_access(struct mmc_host *mmc, struct mmc_data *data)
+{
+	struct scatterlist *sg;
+	int i;
+
+	/* Reject request if any element offset or size is not 32bit aligned */
+	for_each_sg(data->sg, sg, data->sg_len, i) {
+		if (!IS_ALIGNED(sg->offset, sizeof(u32)) ||
+		    !IS_ALIGNED(sg->length, sizeof(u32))) {
+			dev_err(mmc_dev(mmc), "unaligned sg offset %u len %u\n",
+				data->sg->offset, data->sg->length);
+			return -EINVAL;
+		}
+	}
+
+	return 0;
+}
+
 static void meson_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 {
 	struct meson_host *host = mmc_priv(mmc);
-	bool needs_pre_post_req = mrq->data &&
+	host->needs_pre_post_req = mrq->data &&
 			!(mrq->data->host_cookie & SD_EMMC_PRE_REQ_DONE);
 
-	if (needs_pre_post_req) {
-		meson_mmc_get_transfer_mode(mmc, mrq);
-		if (!meson_mmc_desc_chain_mode(mrq->data))
-			needs_pre_post_req = false;
+	/*
+	 * The memory at the end of the controller used as bounce buffer for
+	 * the dram_access_quirk only accepts 32bit read/write access,
+	 * check the aligment and length of the data before starting the request.
+	 */
+	if (host->dram_access_quirk && mrq->data) {
+		mrq->cmd->error = meson_mmc_validate_dram_access(mmc, mrq->data);
+		if (mrq->cmd->error) {
+			mmc_request_done(mmc, mrq);
+			return;
+		}
 	}
 
-	if (needs_pre_post_req)
+	if (host->needs_pre_post_req) {
+		meson_mmc_get_transfer_mode(mmc, mrq);
+		if (!meson_mmc_desc_chain_mode(mrq->data))
+			host->needs_pre_post_req = false;
+	}
+
+	if (host->needs_pre_post_req)
 		meson_mmc_pre_req(mmc, mrq);
 
 	/* Stop execution */
 	writel(0, host->regs + SD_EMMC_START);
 
 	meson_mmc_start_cmd(mmc, mrq->sbc ?: mrq->cmd);
-
-	if (needs_pre_post_req)
-		meson_mmc_post_req(mmc, mrq, 0);
 }
 
 static void meson_mmc_read_resp(struct mmc_host *mmc, struct mmc_command *cmd)
