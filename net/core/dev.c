@@ -3646,7 +3646,6 @@ static int xmit_one(struct sk_buff *skb, struct net_device *dev,
 {
 	unsigned int len;
 	int rc;
-
 #ifdef CONFIG_SHORTCUT_FE
 	/* If this skb has been fast forwarded then we don't want it to
 	 * go to any taps (by definition we're trying to bypass them).
@@ -5309,7 +5308,6 @@ another_round:
 		}
 	}
 #endif
-
 	if (skb_skip_tc_classify(skb))
 		goto skip_classify;
 
