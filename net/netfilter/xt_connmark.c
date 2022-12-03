@@ -24,7 +24,6 @@ MODULE_ALIAS("ipt_connmark");
 MODULE_ALIAS("ip6t_connmark");
 
 static unsigned int
-connmark_tg_shift(struct sk_buff *skb, const struct xt_connmark_tginfo2 *info)
 connmark_tg_shift(struct sk_buff *skb, const struct xt_connmark_tginfo3 *info)
 {
 	enum ip_conntrack_info ctinfo;
