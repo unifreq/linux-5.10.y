@@ -545,7 +545,7 @@ static void *nvmem_cell_get_mac_address(struct nvmem_cell *cell)
 
 	mac = nvmem_cell_read(cell, &len);
 	if (IS_ERR(mac))
-		return PTR_ERR(mac);
+		return mac;
 	if (len != ETH_ALEN) {
 		kfree(mac);
 		return ERR_PTR(-EINVAL);
@@ -562,7 +562,7 @@ static void *nvmem_cell_get_mac_address_ascii(struct nvmem_cell *cell)
 
 	mac_ascii = nvmem_cell_read(cell, &len);
 	if (IS_ERR(mac_ascii))
-		return PTR_ERR(mac_ascii);
+		return mac_ascii;
 	if (len != ETH_ALEN*2+5) {
 		kfree(mac_ascii);
 		return ERR_PTR(-EINVAL);
