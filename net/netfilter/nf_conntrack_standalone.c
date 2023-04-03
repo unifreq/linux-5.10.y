@@ -25,9 +25,6 @@
 #include <net/netfilter/nf_conntrack_timestamp.h>
 #include <linux/rculist_nulls.h>
 
-/* Do not check the TCP window for incoming packets  */
-static int nf_ct_tcp_no_window_check __read_mostly = 1;
-
 static bool enable_hooks __read_mostly;
 MODULE_PARM_DESC(enable_hooks, "Always enable conntrack hooks");
 module_param(enable_hooks, bool, 0000);
@@ -660,7 +657,6 @@ enum nf_ct_sysctl_index {
 	NF_SYSCTL_CT_PROTO_TIMEOUT_GRE_STREAM,
 #endif
 
-	NF_SYSCTL_CT_PROTO_TCP_NO_WINDOW_CHECK,
 	__NF_SYSCTL_CT_LAST_SYSCTL,
 };
 
@@ -997,13 +993,6 @@ static struct ctl_table nf_ct_sysctl_table[] = {
 		.proc_handler   = proc_dointvec_jiffies,
 	},
 #endif
-	[NF_SYSCTL_CT_PROTO_TCP_NO_WINDOW_CHECK] = {
-		.procname       = "nf_conntrack_tcp_no_window_check",
-		.data           = &nf_ct_tcp_no_window_check,
-		.maxlen         = sizeof(unsigned int),
-		.mode           = 0644,
-		.proc_handler   = proc_dointvec,
-	},
 	{}
 };
 
