@@ -1,0 +1,7 @@
+config MT7668
+        tristate "MediaTek MT7668 (SDIO) support"
+        depends on MAC80211
+        depends on USB
+        depends on MT76_CORE
+        help
+          This adds support for MT7668-based wireless SDIO.
