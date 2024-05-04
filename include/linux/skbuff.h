@@ -863,7 +863,6 @@ struct sk_buff {
 #endif
 
 	__u8			scm_io_uring:1;
-	__u8			gro_skip:1;
 
 #ifdef CONFIG_SHORTCUT_FE
 	__u8			fast_forwarded:1;
