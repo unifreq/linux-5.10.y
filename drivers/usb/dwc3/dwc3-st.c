@@ -256,7 +256,7 @@ static int st_dwc3_probe(struct platform_device *pdev)
 	}
 
 	/* Allocate and initialize the core */
-	ret = devm_of_platform_populate(dev);
+	ret = of_platform_populate(node, NULL, NULL, dev);
 	if (ret) {
 		dev_err(dev, "failed to add dwc3 core\n");
 		goto err_node_put;
@@ -306,6 +306,8 @@ undo_powerdown:
 static int st_dwc3_remove(struct platform_device *pdev)
 {
 	struct st_dwc3 *dwc3_data = platform_get_drvdata(pdev);
+
+	of_platform_depopulate(&pdev->dev);
 
 	reset_control_assert(dwc3_data->rstc_pwrdn);
 	reset_control_assert(dwc3_data->rstc_rst);

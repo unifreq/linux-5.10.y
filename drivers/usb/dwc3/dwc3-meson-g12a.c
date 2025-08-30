@@ -707,6 +707,7 @@ static int dwc3_meson_g12a_probe(struct platform_device *pdev)
 {
 	struct dwc3_meson_g12a	*priv;
 	struct device		*dev = &pdev->dev;
+	struct device_node	*np = dev->of_node;
 	void __iomem *base;
 	int ret, i;
 
@@ -754,7 +755,7 @@ static int dwc3_meson_g12a_probe(struct platform_device *pdev)
 
 	ret = dwc3_meson_g12a_get_phys(priv);
 	if (ret)
-		goto err_rearm;
+		goto err_disable_clks;
 
 	ret = priv->drvdata->setup_regmaps(priv, base);
 	if (ret)
@@ -763,7 +764,7 @@ static int dwc3_meson_g12a_probe(struct platform_device *pdev)
 	if (priv->vbus) {
 		ret = regulator_enable(priv->vbus);
 		if (ret)
-			goto err_rearm;
+			goto err_disable_clks;
 	}
 
 	/* Get dr_mode */
@@ -776,13 +777,13 @@ static int dwc3_meson_g12a_probe(struct platform_device *pdev)
 
 	ret = priv->drvdata->usb_init(priv);
 	if (ret)
-		goto err_rearm;
+		goto err_disable_regulator;
 
 	/* Init PHYs */
 	for (i = 0 ; i < PHY_COUNT ; ++i) {
 		ret = phy_init(priv->phys[i]);
 		if (ret)
-			goto err_rearm;
+			goto err_disable_regulator;
 	}
 
 	/* Set PHY Power */
@@ -798,7 +799,7 @@ static int dwc3_meson_g12a_probe(struct platform_device *pdev)
 			goto err_phys_power;
 	}
 
-	ret = devm_of_platform_populate(dev);
+	ret = of_platform_populate(np, NULL, NULL, dev);
 	if (ret)
 		goto err_phys_power;
 
@@ -823,9 +824,6 @@ err_phys_exit:
 	for (i = 0 ; i < PHY_COUNT ; ++i)
 		phy_exit(priv->phys[i]);
 
-err_rearm:
-	reset_control_rearm(priv->reset);
-
 err_disable_regulator:
 	if (priv->vbus)
 		regulator_disable(priv->vbus);
@@ -846,6 +844,11 @@ static int dwc3_meson_g12a_remove(struct platform_device *pdev)
 	if (priv->drvdata->otg_switch_supported)
 		usb_role_switch_unregister(priv->role_switch);
 
+	put_device(priv->switch_desc.udc);
+	put_device(priv->switch_desc.usb2_port);
+
+	of_platform_depopulate(dev);
+
 	for (i = 0 ; i < PHY_COUNT ; ++i) {
 		phy_power_off(priv->phys[i]);
 		phy_exit(priv->phys[i]);
@@ -854,8 +857,6 @@ static int dwc3_meson_g12a_remove(struct platform_device *pdev)
 	pm_runtime_disable(dev);
 	pm_runtime_put_noidle(dev);
 	pm_runtime_set_suspended(dev);
-
-	reset_control_rearm(priv->reset);
 
 	clk_bulk_disable_unprepare(priv->drvdata->num_clks,
 				   priv->drvdata->clks);
@@ -897,7 +898,7 @@ static int __maybe_unused dwc3_meson_g12a_suspend(struct device *dev)
 		phy_exit(priv->phys[i]);
 	}
 
-	reset_control_rearm(priv->reset);
+	reset_control_assert(priv->reset);
 
 	return 0;
 }
@@ -907,9 +908,7 @@ static int __maybe_unused dwc3_meson_g12a_resume(struct device *dev)
 	struct dwc3_meson_g12a *priv = dev_get_drvdata(dev);
 	int i, ret;
 
-	ret = reset_control_reset(priv->reset);
-	if (ret)
-		return ret;
+	reset_control_deassert(priv->reset);
 
 	ret = priv->drvdata->usb_init(priv);
 	if (ret)

@@ -510,7 +510,7 @@ static int dwc3_omap_probe(struct platform_device *pdev)
 	if (ret < 0)
 		goto err1;
 
-	ret = devm_of_platform_populate(dev);
+	ret = of_platform_populate(node, NULL, NULL, dev);
 	if (ret) {
 		dev_err(&pdev->dev, "failed to create dwc3 core\n");
 		goto err1;
@@ -542,6 +542,7 @@ static int dwc3_omap_remove(struct platform_device *pdev)
 
 	dwc3_omap_disable_irqs(omap);
 	disable_irq(omap->irq);
+	of_platform_depopulate(omap->dev);
 	pm_runtime_put_sync(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
 

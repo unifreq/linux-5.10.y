@@ -101,7 +101,7 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
 	}
 
 	if (node) {
-		ret = devm_of_platform_populate(dev);
+		ret = of_platform_populate(node, NULL, NULL, dev);
 		if (ret) {
 			dev_err(dev, "failed to add dwc3 core\n");
 			goto populate_err;

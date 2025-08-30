@@ -157,7 +157,7 @@ static int kdwc3_probe(struct platform_device *pdev)
 	kdwc3_enable_irqs(kdwc);
 
 skip_irq:
-	error = devm_of_platform_populate(dev);
+	error = of_platform_populate(node, NULL, NULL, dev);
 	if (error) {
 		dev_err(&pdev->dev, "failed to create dwc3 core\n");
 		goto err_core;
