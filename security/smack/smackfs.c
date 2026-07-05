@@ -1598,7 +1598,7 @@ static ssize_t smk_read_doi(struct file *filp, char __user *buf,
 	if (*ppos != 0)
 		return 0;
 
-	sprintf(temp, "%lu", (unsigned long)smk_cipso_doi_value);
+	snprintf(temp, sizeof(temp), "%lu", (unsigned long)smk_cipso_doi_value);
 	rc = simple_read_from_buffer(buf, count, ppos, temp, strlen(temp));
 
 	return rc;
@@ -1663,7 +1663,7 @@ static ssize_t smk_read_direct(struct file *filp, char __user *buf,
 	if (*ppos != 0)
 		return 0;
 
-	sprintf(temp, "%d", smack_cipso_direct);
+	snprintf(temp, sizeof(temp), "%d", smack_cipso_direct);
 	rc = simple_read_from_buffer(buf, count, ppos, temp, strlen(temp));
 
 	return rc;
@@ -1741,7 +1741,7 @@ static ssize_t smk_read_mapped(struct file *filp, char __user *buf,
 	if (*ppos != 0)
 		return 0;
 
-	sprintf(temp, "%d", smack_cipso_mapped);
+	snprintf(temp, sizeof(temp), "%d", smack_cipso_mapped);
 	rc = simple_read_from_buffer(buf, count, ppos, temp, strlen(temp));
 
 	return rc;
@@ -2179,7 +2179,7 @@ static ssize_t smk_read_logging(struct file *filp, char __user *buf,
 	if (*ppos != 0)
 		return 0;
 
-	sprintf(temp, "%d\n", log_policy);
+	snprintf(temp, sizeof(temp), "%d\n", log_policy);
 	rc = simple_read_from_buffer(buf, count, ppos, temp, strlen(temp));
 	return rc;
 }
